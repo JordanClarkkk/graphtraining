@@ -1827,4 +1827,188 @@ type Query {
   ],
 },
 
+// ============================================================
+// LESSON 8: Resolvers Deep Dive
+// ============================================================
+{
+  id: 8,
+  title: 'Resolvers Deep Dive',
+  level: 'intermediate',
+  steps: [
+    {
+      type: 'explain',
+      title: 'What are Resolvers?',
+      content: `
+        <p><strong>Resolvers</strong> are functions that produce the data for each field in your schema.
+        Every field maps to a resolver function.</p>
+        <p>A resolver receives <strong>four arguments</strong>:</p>
+        <table class="comparison-table">
+          <tr><th>Argument</th><th>Description</th></tr>
+          <tr><td><code>parent</code></td><td>The result returned by the <em>parent</em> resolver (for nested fields)</td></tr>
+          <tr><td><code>args</code></td><td>Arguments passed to this field</td></tr>
+          <tr><td><code>context</code></td><td>Shared state across all resolvers (auth, DB, etc.)</td></tr>
+          <tr><td><code>info</code></td><td>Query execution metadata (rarely used directly)</td></tr>
+        </table>
+      `,
+    },
+    {
+      type: 'explain',
+      title: 'The Resolver Chain',
+      content: `
+        <p>GraphQL resolves queries <strong>top-down, field by field</strong>.
+        Each resolver's return value becomes the <code>parent</code> argument
+        for its child resolvers:</p>
+      `,
+      code: `# Query
+{ user(id: "1") { name posts { title } } }
+
+# Execution order (top-down):
+# 1. Query.user(parent=null, args={id:"1"})
+#    → returns { id:"1", firstName:"Alice", lastName:"Smith" }
+#
+# 2. User.name(parent=userObj)
+#    → returns "Alice" (default resolver: parent["name"])
+#
+# 3. User.posts(parent=userObj)
+#    → returns [post1, post2]
+#
+# 4. Post.title(parent=post1)
+#    → returns "GraphQL Basics"
+#
+# 5. Post.title(parent=post2)
+#    → returns "Advanced Resolvers"`,
+    },
+    {
+      type: 'explain',
+      title: 'Default Resolvers',
+      content: `
+        <p>You don't need to write a resolver for <em>every</em> field!
+        GraphQL has a <strong>default resolver</strong> that simply does:</p>
+        <p><code>parent => parent[fieldName]</code></p>
+        <p>So if your data object already has matching property names,
+        it just works. Only write custom resolvers for:</p>
+        <ul>
+          <li><strong>Computed fields</strong> — e.g., <code>fullName</code> = firstName + lastName</li>
+          <li><strong>Database lookups</strong> — fields that need to fetch related data</li>
+          <li><strong>Transformations</strong> — formatting, filtering, etc.</li>
+        </ul>
+      `,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Computed Fields',
+      content: `
+        <p>This schema has <strong>computed fields</strong> powered by custom resolvers:</p>
+        <ul>
+          <li><code>fullName</code> = firstName + " " + lastName</li>
+          <li><code>postCount</code> = number of user's posts</li>
+          <li><code>wordCount</code> = words in post body</li>
+        </ul>
+        <p>Query user <code>"1"</code> and get <code>fullName</code>, <code>email</code>, <code>postCount</code>,
+        and their posts with <code>title</code> and <code>wordCount</code>.</p>
+      `,
+      schema: `type Query {
+  user(id: ID!): User
+}
+
+type User {
+  id: ID!
+  firstName: String!
+  lastName: String!
+  fullName: String!
+  email: String!
+  posts: [Post!]!
+  postCount: Int!
+}
+
+type Post {
+  id: ID!
+  title: String!
+  body: String!
+  wordCount: Int!
+}`,
+      resolverKey: '8:users',
+      defaultQuery: `{
+  user(id: "1") {
+    fullName
+    email
+    postCount
+    posts {
+      title
+      wordCount
+    }
+  }
+}`,
+      validate: (result) => {
+        const user = result.data?.user;
+        if (user?.fullName && user?.postCount !== undefined && user?.posts?.[0]?.wordCount !== undefined) {
+          return { pass: true, message: 'See how resolvers compute fullName, postCount, and wordCount on-the-fly from the underlying data!' };
+        }
+        return { pass: false, message: 'Include fullName, email, postCount, and posts { title wordCount }.' };
+      },
+      hint: '{ user(id: "1") { fullName email postCount posts { title wordCount } } }',
+    },
+    {
+      type: 'explain',
+      title: 'The Context Argument',
+      content: `
+        <p>The <code>context</code> object is shared across <strong>all resolvers</strong> in a single request.
+        It's the perfect place for:</p>
+        <ul>
+          <li>Authentication info (current user)</li>
+          <li>Database connections / ORM instances</li>
+          <li>DataLoaders (for batching — covered later)</li>
+          <li>Request-scoped caching</li>
+        </ul>
+      `,
+      code: `// Server setup — build context per request
+const server = new ApolloServer({
+  schema,
+  context: ({ req }) => ({
+    currentUser: authenticateUser(req.headers.authorization),
+    db: databaseConnection,
+    loaders: createDataLoaders(),
+  }),
+});
+
+// In a resolver — use context.currentUser
+const resolvers = {
+  Query: {
+    myProfile: (_, __, context) => {
+      if (!context.currentUser)
+        throw new Error('Not authenticated');
+      return context.db.users.findById(context.currentUser.id);
+    },
+  },
+};`,
+    },
+    {
+      type: 'quiz',
+      title: 'Resolver Arguments',
+      question: 'What are the four arguments a resolver function receives?',
+      choices: [
+        'query, variables, schema, types',
+        'parent, args, context, info',
+        'request, response, next, error',
+        'data, errors, extensions, path',
+      ],
+      answer: 'parent, args, context, info',
+      successMessage: 'Correct! parent (from parent resolver), args (field arguments), context (shared state), info (metadata).',
+    },
+    {
+      type: 'quiz',
+      title: 'Default Resolvers',
+      question: 'When do you NOT need to write a custom resolver?',
+      choices: [
+        'When the field needs a database lookup',
+        'When the field name matches the property name on the parent object',
+        'When the field has arguments',
+        'When the field returns a list',
+      ],
+      answer: 'When the field name matches the property name on the parent object',
+      successMessage: 'Right! The default resolver automatically returns parent[fieldName] — no code needed.',
+    },
+  ],
+},
+
 ]; // end LESSONS
