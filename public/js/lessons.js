@@ -2011,4 +2011,226 @@ const resolvers = {
   ],
 },
 
+// ============================================================
+// LESSON 9: Error Handling
+// ============================================================
+{
+  id: 9,
+  title: 'Error Handling',
+  level: 'intermediate',
+  steps: [
+    {
+      type: 'explain',
+      title: 'GraphQL Error Model',
+      content: `
+        <p>GraphQL handles errors very differently from REST:</p>
+        <table class="comparison-table">
+          <tr><th>REST</th><th>GraphQL</th></tr>
+          <tr><td>Uses HTTP status codes (404, 500, etc.)</td><td>Always returns <strong>HTTP 200</strong></td></tr>
+          <tr><td>Entire response is error or success</td><td>Can return <strong>both data AND errors</strong></td></tr>
+        </table>
+        <p>A GraphQL response has two top-level fields:</p>
+      `,
+      code: `{
+  "data": {
+    "user": {
+      "name": "Alice",
+      "salary": null          // This field errored
+    }
+  },
+  "errors": [
+    {
+      "message": "Access denied: salary is confidential",
+      "locations": [{ "line": 4, "column": 5 }],
+      "path": ["user", "salary"]
+    }
+  ]
+}`,
+      language: 'json',
+    },
+    {
+      type: 'explain',
+      title: 'Partial Responses',
+      content: `
+        <p>The most important concept: you can get <strong>data AND errors</strong> in the same response.
+        This is called a <strong>partial response</strong>.</p>
+        <ul>
+          <li>Fields that resolved successfully → appear in <code>data</code></li>
+          <li>Fields that failed → become <code>null</code> in <code>data</code>, with details in <code>errors</code></li>
+        </ul>
+        <p>This means one broken field doesn't take down the entire response!</p>
+      `,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: See a Partial Response',
+      content: `
+        <p>Query user <code>"1"</code> and request <code>name</code>, <code>email</code>,
+        <code>role</code>, AND <code>salary</code>.</p>
+        <p>The salary resolver will throw an error — but the other fields will still return data!</p>
+      `,
+      schema: `type User {
+  id: ID!
+  name: String!
+  email: String!
+  role: String!
+  salary: Float
+  secretNotes: String
+}
+
+type Query {
+  user(id: ID!): User
+  users: [User!]!
+  riskyField: String
+}`,
+      resolverKey: '9:users',
+      defaultQuery: `{
+  user(id: "1") {
+    name
+    email
+    role
+    salary
+  }
+}`,
+      validate: (result) => {
+        if (result.errors && result.data?.user?.name) {
+          return { pass: true, message: 'Partial response! You got name/email/role data AND a salary error. Both coexist.' };
+        }
+        if (result.data?.user) {
+          return { pass: false, message: 'Include the salary field to trigger the error.' };
+        }
+        return { pass: false, message: 'Query user "1" with name, email, role, and salary.' };
+      },
+      hint: 'Add salary to your field list: { user(id: "1") { name email role salary } }',
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Non-existent Data',
+      content: `
+        <p>What happens when you query a user that doesn't exist?</p>
+        <p>Try querying user with id <code>"999"</code>.</p>
+      `,
+      schema: `type User {
+  id: ID!
+  name: String!
+  email: String!
+  role: String!
+  salary: Float
+  secretNotes: String
+}
+
+type Query {
+  user(id: ID!): User
+  users: [User!]!
+  riskyField: String
+}`,
+      resolverKey: '9:users',
+      defaultQuery: `{
+  user(id: "999") {
+    name
+    email
+  }
+}`,
+      validate: (result) => {
+        if (result.errors && result.errors.some(e => e.message.includes('not found'))) {
+          return { pass: true, message: 'The resolver threw an error for the missing user. This is a common pattern for "not found" errors.' };
+        }
+        return { pass: false, message: 'Query a non-existent user id like "999".' };
+      },
+    },
+    {
+      type: 'explain',
+      title: 'Null Bubbling',
+      content: `
+        <p><strong>Null bubbling</strong> is a critical concept. When a <code>!</code> (non-null) field
+        errors, the null propagates UP to the nearest nullable parent:</p>
+        <div class="info-box warning">
+          <strong>Example:</strong> If <code>name: String!</code> errors, it can't be null (it's non-null!).
+          So GraphQL nulls out the entire parent object instead.
+          This can cascade all the way up to the root if everything is non-null.
+        </div>
+      `,
+      code: `type User {
+  name: String!     # If this errors...
+  email: String     # This is fine
+}
+
+type Query {
+  user(id: ID!): User   # ...the whole "user" becomes null!
+}
+
+# Response:
+# { "data": { "user": null }, "errors": [...] }
+#
+# The entire user is nulled because "name" was non-null
+# and couldn't return null itself.`,
+    },
+    {
+      type: 'explain',
+      title: 'Error Handling Strategies',
+      content: `
+        <p>Two main approaches to error handling:</p>
+        <p><strong>1. Throw errors</strong> (what we just saw)</p>
+        <ul>
+          <li>Errors appear in the <code>errors</code> array</li>
+          <li>Simple and built-in</li>
+          <li>Good for unexpected errors</li>
+        </ul>
+        <p><strong>2. Union-based errors</strong> (recommended for expected errors)</p>
+      `,
+      code: `# Union-based errors — client handles them explicitly
+union UserResult = User | NotFoundError | ValidationError
+
+type NotFoundError {
+  message: String!
+  id: ID!
+}
+
+type ValidationError {
+  message: String!
+  field: String!
+}
+
+type Query {
+  user(id: ID!): UserResult!
+}
+
+# Query with inline fragments:
+{
+  user(id: "1") {
+    ... on User { name email }
+    ... on NotFoundError { message id }
+    ... on ValidationError { message field }
+  }
+}`,
+    },
+    {
+      type: 'quiz',
+      title: 'Error Model Quiz',
+      question: 'What HTTP status code does a GraphQL API return when there are errors?',
+      choices: [
+        '400 Bad Request',
+        '500 Internal Server Error',
+        '200 OK (with errors in the response body)',
+        'It depends on the error type',
+      ],
+      answer: '200 OK (with errors in the response body)',
+      successMessage: 'Correct! GraphQL always returns 200. Errors are data, not transport-level failures.',
+    },
+    {
+      type: 'quiz',
+      title: 'Null Bubbling Quiz',
+      question: 'What happens when a non-null (!) field resolver throws an error?',
+      choices: [
+        'The field returns null',
+        'The error is silently ignored',
+        'The error propagates up to the nearest nullable parent',
+        'The entire response is null',
+      ],
+      answer: 'The error propagates up to the nearest nullable parent',
+      successMessage: 'Right! This is "null bubbling" — be careful with non-null types on fields that might fail.',
+    },
+  ],
+},
+
 ]; // end LESSONS
