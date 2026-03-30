@@ -1232,4 +1232,376 @@ type Mutation {
   ],
 },
 
+// ============================================================
+// LESSON 6: Enums, Interfaces & Unions
+// ============================================================
+{
+  id: 6,
+  title: 'Enums, Interfaces & Unions',
+  level: 'intermediate',
+  steps: [
+    {
+      type: 'explain',
+      title: 'Enums — Restricted Value Sets',
+      content: `
+        <p><strong>Enums</strong> restrict a field to a specific set of allowed values.
+        No typos, no invalid states — the type system enforces it.</p>
+      `,
+      code: `enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum Status {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+type Bug {
+  title: String!
+  severity: Priority!   # Can ONLY be LOW, MEDIUM, HIGH, or CRITICAL
+  status: Status!
+}`,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Query with Enums',
+      content: `
+        <p>Query all bugs and get their <code>title</code>, <code>severity</code>, and <code>assignee</code>.</p>
+        <p>Notice how severity values are enum constants — not arbitrary strings.</p>
+      `,
+      schema: `enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+interface Node {
+  id: ID!
+  createdAt: String!
+}
+
+interface Assignable {
+  assignee: String
+}
+
+type Bug implements Node & Assignable {
+  id: ID!
+  createdAt: String!
+  title: String!
+  severity: Priority!
+  assignee: String
+  stepsToReproduce: String
+}
+
+type Feature implements Node & Assignable {
+  id: ID!
+  createdAt: String!
+  title: String!
+  priority: Priority!
+  assignee: String
+  businessValue: String
+}
+
+type Comment implements Node {
+  id: ID!
+  createdAt: String!
+  body: String!
+  author: String!
+}
+
+union SearchResult = Bug | Feature | Comment
+
+type Query {
+  issues: [Node!]!
+  bugs: [Bug!]!
+  features: [Feature!]!
+  search(term: String!): [SearchResult!]!
+  issuesByPriority(priority: Priority!): [Assignable!]!
+}`,
+      resolverKey: '6:issues',
+      defaultQuery: `{
+  bugs {
+    title
+    severity
+    assignee
+  }
+}`,
+      validate: (result) => {
+        if (result.data?.bugs?.[0]?.severity) {
+          return { pass: true, message: 'Enums provide type-safe values — no typos possible!' };
+        }
+        return { pass: false, message: 'Query the bugs field with title, severity, and assignee.' };
+      },
+    },
+    {
+      type: 'explain',
+      title: 'Interfaces — Shared Contracts',
+      content: `
+        <p><strong>Interfaces</strong> define a set of fields that multiple types must implement.
+        They enable polymorphism — querying different types through a common contract.</p>
+      `,
+      code: `interface Node {
+  id: ID!
+  createdAt: String!
+}
+
+# Both Bug and Feature MUST have id and createdAt
+type Bug implements Node {
+  id: ID!             # Required by Node
+  createdAt: String!  # Required by Node
+  title: String!      # Bug-specific
+  severity: Priority!
+}
+
+type Feature implements Node {
+  id: ID!
+  createdAt: String!
+  title: String!      # Feature-specific
+  priority: Priority!
+}`,
+    },
+    {
+      type: 'explain',
+      title: 'Inline Fragments — Type-Specific Fields',
+      content: `
+        <p>When querying an interface, you can only directly access the shared fields.
+        To get type-specific fields, use <strong>inline fragments</strong>:</p>
+      `,
+      code: `{
+  issues {
+    # Shared fields from Node interface — always available
+    id
+    createdAt
+
+    # Type-specific fields via inline fragments
+    ... on Bug {
+      title
+      severity
+      stepsToReproduce
+    }
+    ... on Feature {
+      title
+      priority
+      businessValue
+    }
+    ... on Comment {
+      body
+      author
+    }
+  }
+}`,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Query an Interface',
+      content: `
+        <p>Query <code>issues</code> (which returns the <code>Node</code> interface) and use
+        <strong>inline fragments</strong> to get type-specific fields for Bugs, Features, and Comments.</p>
+        <p>Include <code>id</code> and <code>createdAt</code> (shared), plus unique fields for each type.</p>
+      `,
+      schema: `enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+interface Node {
+  id: ID!
+  createdAt: String!
+}
+
+interface Assignable {
+  assignee: String
+}
+
+type Bug implements Node & Assignable {
+  id: ID!
+  createdAt: String!
+  title: String!
+  severity: Priority!
+  assignee: String
+  stepsToReproduce: String
+}
+
+type Feature implements Node & Assignable {
+  id: ID!
+  createdAt: String!
+  title: String!
+  priority: Priority!
+  assignee: String
+  businessValue: String
+}
+
+type Comment implements Node {
+  id: ID!
+  createdAt: String!
+  body: String!
+  author: String!
+}
+
+union SearchResult = Bug | Feature | Comment
+
+type Query {
+  issues: [Node!]!
+  bugs: [Bug!]!
+  features: [Feature!]!
+  search(term: String!): [SearchResult!]!
+  issuesByPriority(priority: Priority!): [Assignable!]!
+}`,
+      resolverKey: '6:issues',
+      defaultQuery: `{
+  issues {
+    id
+    createdAt
+    ... on Bug {
+      title
+      severity
+    }
+    ... on Feature {
+      title
+      priority
+    }
+    ... on Comment {
+      body
+      author
+    }
+  }
+}`,
+      validate: (result) => {
+        const issues = result.data?.issues;
+        if (issues && issues.length > 0 && (issues.some(i => i.severity) || issues.some(i => i.priority))) {
+          return { pass: true, message: 'You queried multiple types through a shared interface using inline fragments!' };
+        }
+        return { pass: false, message: 'Use inline fragments: ... on Bug { }, ... on Feature { }, ... on Comment { }' };
+      },
+      hint: 'Inside issues { }, add: ... on Bug { title severity } ... on Feature { title priority }',
+    },
+    {
+      type: 'explain',
+      title: 'Union Types — No Shared Fields',
+      content: `
+        <p><strong>Unions</strong> are like interfaces but <em>without</em> any guaranteed shared fields.
+        A union says "this field returns one of these types":</p>
+      `,
+      code: `union SearchResult = Bug | Feature | Comment
+
+type Query {
+  search(term: String!): [SearchResult!]!
+}
+
+# Since unions have NO common fields,
+# you MUST use inline fragments for everything:
+{
+  search(term: "dark") {
+    ... on Bug { title severity }
+    ... on Feature { title businessValue }
+    ... on Comment { body author }
+  }
+}`,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Search with Unions',
+      content: `
+        <p>Use the <code>search</code> query with term <code>"dark"</code> to find matching items.</p>
+        <p>Handle all three possible return types with inline fragments.</p>
+      `,
+      schema: `enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+interface Node {
+  id: ID!
+  createdAt: String!
+}
+
+interface Assignable {
+  assignee: String
+}
+
+type Bug implements Node & Assignable {
+  id: ID!
+  createdAt: String!
+  title: String!
+  severity: Priority!
+  assignee: String
+  stepsToReproduce: String
+}
+
+type Feature implements Node & Assignable {
+  id: ID!
+  createdAt: String!
+  title: String!
+  priority: Priority!
+  assignee: String
+  businessValue: String
+}
+
+type Comment implements Node {
+  id: ID!
+  createdAt: String!
+  body: String!
+  author: String!
+}
+
+union SearchResult = Bug | Feature | Comment
+
+type Query {
+  issues: [Node!]!
+  bugs: [Bug!]!
+  features: [Feature!]!
+  search(term: String!): [SearchResult!]!
+  issuesByPriority(priority: Priority!): [Assignable!]!
+}`,
+      resolverKey: '6:issues',
+      defaultQuery: `{
+  search(term: "dark") {
+    ... on Bug {
+      title
+      severity
+    }
+    ... on Feature {
+      title
+      businessValue
+    }
+    ... on Comment {
+      body
+      author
+    }
+  }
+}`,
+      validate: (result) => {
+        const results = result.data?.search;
+        if (results && results.length > 0) {
+          return { pass: true, message: 'Union types enable powerful polymorphic search results!' };
+        }
+        return { pass: false, message: 'Search for "dark" with inline fragments for each type.' };
+      },
+    },
+    {
+      type: 'quiz',
+      title: 'Interfaces vs Unions',
+      question: 'What is the key difference between interfaces and unions?',
+      choices: [
+        'Interfaces are faster than unions',
+        'Interfaces define shared fields that types must implement; unions have no shared fields',
+        'Unions can only contain two types',
+        'There is no difference',
+      ],
+      answer: 'Interfaces define shared fields that types must implement; unions have no shared fields',
+      successMessage: 'Exactly! Use interfaces when types share common fields, unions when they don\'t.',
+    },
+  ],
+},
+
 ]; // end LESSONS
