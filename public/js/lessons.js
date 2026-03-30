@@ -1604,4 +1604,227 @@ type Query {
   ],
 },
 
+// ============================================================
+// LESSON 7: Directives
+// ============================================================
+{
+  id: 7,
+  title: 'Directives',
+  level: 'intermediate',
+  steps: [
+    {
+      type: 'explain',
+      title: 'Built-in Directives',
+      content: `
+        <p><strong>Directives</strong> modify how a field or fragment is executed.
+        GraphQL has two built-in directives:</p>
+        <table class="comparison-table">
+          <tr><th>Directive</th><th>Effect</th></tr>
+          <tr><td><code>@include(if: Boolean!)</code></td><td>Include this field <strong>only if</strong> condition is true</td></tr>
+          <tr><td><code>@skip(if: Boolean!)</code></td><td>Skip this field <strong>if</strong> condition is true</td></tr>
+        </table>
+        <p>These are controlled by <strong>variables</strong>, making queries dynamic at runtime!</p>
+      `,
+    },
+    {
+      type: 'explain',
+      title: '@include and @skip in Action',
+      content: `
+        <p>Directives let clients dynamically control which fields are returned
+        without rewriting the query:</p>
+      `,
+      code: `query GetProducts(
+  $showReviews: Boolean!
+  $hidePrice: Boolean!
+) {
+  products {
+    name
+    price @skip(if: $hidePrice)
+    reviews @include(if: $showReviews) {
+      rating
+      comment
+    }
+  }
+}
+
+# Variables: { "showReviews": true, "hidePrice": false }
+# → Shows reviews AND price
+
+# Variables: { "showReviews": false, "hidePrice": true }
+# → Hides reviews AND hides price`,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Conditional Fields with @include',
+      content: `
+        <p>Write a query that fetches products with:</p>
+        <ul>
+          <li><code>name</code> and <code>price</code> (always)</li>
+          <li><code>description</code> conditionally via <code>@include(if: $withDetails)</code></li>
+          <li><code>manufacturer { name country }</code> conditionally via <code>@include(if: $withDetails)</code></li>
+        </ul>
+        <div class="info-box">Variables <code>{"withDetails": true}</code> will be sent automatically.</div>
+      `,
+      schema: `type Product {
+  id: ID!
+  name: String!
+  price: Float!
+  description: String
+  inStock: Boolean!
+  reviews: [Review!]!
+  manufacturer: Manufacturer
+}
+
+type Review {
+  id: ID!
+  rating: Int!
+  comment: String
+  author: String!
+}
+
+type Manufacturer {
+  name: String!
+  country: String!
+  website: String
+}
+
+type Query {
+  products: [Product!]!
+  product(id: ID!): Product
+}`,
+      resolverKey: '7:products',
+      variables: { withDetails: true },
+      defaultQuery: `query GetProducts($withDetails: Boolean!) {
+  products {
+    name
+    price
+    description @include(if: $withDetails)
+    manufacturer @include(if: $withDetails) {
+      name
+      country
+    }
+  }
+}`,
+      validate: (result) => {
+        const prods = result.data?.products;
+        if (prods && prods[0]?.name && prods[0]?.manufacturer?.name) {
+          return { pass: true, message: 'With $withDetails: true, you get the extra fields! Change it to false and they disappear.' };
+        }
+        return { pass: false, message: 'Use @include(if: $withDetails) on description and manufacturer.' };
+      },
+      hint: 'Add @include(if: $withDetails) after description and after manufacturer.',
+      solution: `query GetProducts($withDetails: Boolean!) {
+  products {
+    name
+    price
+    description @include(if: $withDetails)
+    manufacturer @include(if: $withDetails) {
+      name
+      country
+    }
+  }
+}`,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: @skip Directive',
+      content: `
+        <p>Now use <code>@skip</code> to conditionally <strong>hide</strong> reviews.</p>
+        <p>Query product <code>"p1"</code> with name, price, inStock, and reviews.
+        Skip reviews when <code>$compact</code> is true.</p>
+        <div class="info-box">Variables <code>{"compact": true}</code> will be sent — reviews should be hidden!</div>
+      `,
+      schema: `type Product {
+  id: ID!
+  name: String!
+  price: Float!
+  description: String
+  inStock: Boolean!
+  reviews: [Review!]!
+  manufacturer: Manufacturer
+}
+
+type Review {
+  id: ID!
+  rating: Int!
+  comment: String
+  author: String!
+}
+
+type Manufacturer {
+  name: String!
+  country: String!
+  website: String
+}
+
+type Query {
+  products: [Product!]!
+  product(id: ID!): Product
+}`,
+      resolverKey: '7:products',
+      variables: { compact: true },
+      defaultQuery: `query GetProduct($compact: Boolean!) {
+  product(id: "p1") {
+    name
+    price
+    inStock
+    reviews @skip(if: $compact) {
+      rating
+      author
+    }
+  }
+}`,
+      validate: (result) => {
+        const product = result.data?.product;
+        if (product?.name && product?.inStock !== undefined && !product?.reviews) {
+          return { pass: true, message: 'Reviews were skipped! @skip(if: true) hides the field entirely from the response.' };
+        }
+        if (product?.reviews) {
+          return { pass: false, message: 'Reviews should be hidden. Use @skip(if: $compact) on the reviews field.' };
+        }
+        return { pass: false, message: 'Query product "p1" with reviews @skip(if: $compact).' };
+      },
+    },
+    {
+      type: 'explain',
+      title: 'Directives on Fragments',
+      content: `
+        <p>You can also apply directives to <strong>inline fragments</strong> to conditionally
+        include a whole group of fields:</p>
+      `,
+      code: `query GetProducts($detailed: Boolean!) {
+  products {
+    name
+    price
+
+    # Conditionally include an ENTIRE group of fields
+    ... @include(if: $detailed) {
+      description
+      inStock
+      manufacturer {
+        name
+        country
+        website
+      }
+    }
+  }
+}`,
+    },
+    {
+      type: 'quiz',
+      title: 'Directive Precedence',
+      question: 'What happens if you use @skip(if: true) and @include(if: true) on the same field?',
+      choices: [
+        'The field is included (@include wins)',
+        'The field is skipped (@skip wins)',
+        'It causes an error',
+        'The field is included because both conditions are met',
+      ],
+      answer: 'The field is skipped (@skip wins)',
+      successMessage: 'Correct! @skip takes precedence — it acts as a veto regardless of @include.',
+      hint: 'Think of @skip as a veto — it overrides @include.',
+    },
+  ],
+},
+
 ]; // end LESSONS
