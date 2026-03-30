@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GraphQL Trainer</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <!-- CodeMirror 6 via CDN -->
+  <script type="module" src="https://cdn.jsdelivr.net/npm/@aspect-ratio/codemirror-bundle@0.0.0/dist/index.min.js"></script>
+  <!-- We'll use a simpler approach: CodeMirror 5 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/hint/show-hint.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/brace-fold.min.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div id="sidebar-header">
+        <div class="logo">
+          <span class="logo-icon">◆</span>
+          <span class="logo-text">GraphQL<span class="logo-highlight">Trainer</span></span>
+        </div>
+      </div>
+      <nav id="lesson-nav"></nav>
+      <div id="sidebar-footer">
+        <div class="progress-summary">
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="global-progress"></div>
+          </div>
+          <span id="progress-text">0 / 15 completed</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main id="main-content">
+      <!-- Welcome screen -->
+      <div id="welcome-screen" class="screen active">
+        <div class="welcome-hero">
+          <h1>Learn GraphQL<br><span class="gradient-text">Interactively</span></h1>
+          <p class="welcome-sub">From absolute beginner to advanced — write real queries,<br>see real results, and build real understanding.</p>
+          <button class="btn btn-primary btn-lg" onclick="startFirstLesson()">
+            Start Learning →
+          </button>
+        </div>
+        <div class="welcome-features">
+          <div class="feature-card">
+            <div class="feature-icon">✏️</div>
+            <h3>Interactive Code</h3>
+            <p>Write and edit real GraphQL queries with syntax highlighting</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Live Execution</h3>
+            <p>Run queries instantly and see results or errors in real-time</p>
+          </div>
+          <div class="feature-card">
+            <div class="feature-icon">📈</div>
+            <h3>Progressive</h3>
+            <p>15 lessons from "What is GraphQL?" to advanced patterns</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lesson screen -->
+      <div id="lesson-screen" class="screen">
+        <div id="lesson-header">
+          <div class="lesson-breadcrumb">
+            <span id="lesson-level-badge" class="level-badge">BEGINNER</span>
+            <span id="lesson-number">Lesson 1</span>
+          </div>
+          <h2 id="lesson-title">What is GraphQL?</h2>
+          <div class="lesson-progress">
+            <div class="step-dots" id="step-dots"></div>
+            <span id="step-counter">Step 1 / 5</span>
+          </div>
+        </div>
+
+        <div id="lesson-body">
+          <!-- Content rendered dynamically -->
+        </div>
+
+        <div id="lesson-footer">
+          <button class="btn btn-ghost" id="btn-prev" onclick="prevStep()">← Previous</button>
+          <button class="btn btn-primary" id="btn-next" onclick="nextStep()">Next →</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/js/lessons.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
