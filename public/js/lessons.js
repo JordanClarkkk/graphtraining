@@ -923,4 +923,313 @@ query GetTasks($status: String) {
   ],
 },
 
+// ============================================================
+// LESSON 5: Mutations
+// ============================================================
+{
+  id: 5,
+  title: 'Mutations',
+  level: 'intermediate',
+  steps: [
+    {
+      type: 'explain',
+      title: 'Mutations — Modifying Data',
+      content: `
+        <p>While queries <strong>read</strong> data, mutations <strong>write</strong> data.
+        Mutations can create, update, or delete records.</p>
+        <p>Convention: mutations live in a <code>Mutation</code> type, separate from <code>Query</code>:</p>
+      `,
+      code: `type Mutation {
+  addTodo(text: String!): Todo!
+  toggleTodo(id: ID!): Todo
+  deleteTodo(id: ID!): Todo
+}
+
+# Using a mutation:
+mutation {
+  addTodo(text: "Learn mutations") {
+    id
+    text
+    completed
+  }
+}`,
+    },
+    {
+      type: 'explain',
+      title: 'Mutation Response Pattern',
+      content: `
+        <p>A key GraphQL pattern: mutations <strong>return the modified data</strong>.
+        This means your UI can update immediately without a second request.</p>
+        <ul>
+          <li>Create a todo → mutation returns the <strong>new</strong> todo</li>
+          <li>Update a todo → mutation returns the <strong>updated</strong> todo</li>
+          <li>Delete a todo → mutation returns the <strong>deleted</strong> todo</li>
+        </ul>
+        <p>You choose what fields to get back — just like a query!</p>
+      `,
+      code: `# The schema for this lesson's exercises:
+type Todo {
+  id: ID!
+  text: String!
+  completed: Boolean!
+  createdAt: String!
+}
+
+type Query {
+  todos: [Todo!]!
+  todo(id: ID!): Todo
+}
+
+type Mutation {
+  addTodo(text: String!): Todo!
+  toggleTodo(id: ID!): Todo
+  deleteTodo(id: ID!): Todo
+  updateTodo(id: ID!, text: String, completed: Boolean): Todo
+}`,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: See the Current Todos',
+      content: `
+        <p>Before we mutate anything, let's see what's already in the database.
+        Query all todos with their <code>id</code>, <code>text</code>, and <code>completed</code> status.</p>
+      `,
+      schema: `type Todo {
+  id: ID!
+  text: String!
+  completed: Boolean!
+  createdAt: String!
+}
+
+type Query {
+  todos: [Todo!]!
+  todo(id: ID!): Todo
+}
+
+type Mutation {
+  addTodo(text: String!): Todo!
+  toggleTodo(id: ID!): Todo
+  deleteTodo(id: ID!): Todo
+  updateTodo(id: ID!, text: String, completed: Boolean): Todo
+}`,
+      resolverKey: '5:todos',
+      defaultQuery: `{
+  todos {
+    id
+    text
+    completed
+  }
+}`,
+      validate: (result) => {
+        if (result.data?.todos?.length >= 3) {
+          return { pass: true, message: 'There are 3 todos. Notice #1 is completed, #2 and #3 are not. Now let\'s mutate them!' };
+        }
+        return { pass: false, message: 'Query: { todos { id text completed } }' };
+      },
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Create a Todo',
+      content: `
+        <p>Write a mutation to add a new todo with the text <code>"Practice GraphQL"</code>.</p>
+        <p>Request back the <code>id</code>, <code>text</code>, and <code>completed</code> fields.</p>
+        <div class="info-box tip">
+          <strong>Important:</strong> Mutations use the keyword <code>mutation</code> instead of <code>query</code>
+          (or the shorthand <code>{ }</code>).
+        </div>
+      `,
+      schema: `type Todo {
+  id: ID!
+  text: String!
+  completed: Boolean!
+  createdAt: String!
+}
+
+type Query {
+  todos: [Todo!]!
+  todo(id: ID!): Todo
+}
+
+type Mutation {
+  addTodo(text: String!): Todo!
+  toggleTodo(id: ID!): Todo
+  deleteTodo(id: ID!): Todo
+  updateTodo(id: ID!, text: String, completed: Boolean): Todo
+}`,
+      resolverKey: '5:todos',
+      defaultQuery: `mutation {
+  addTodo(text: "Practice GraphQL") {
+    id
+    text
+    completed
+  }
+}`,
+      validate: (result) => {
+        if (result.data?.addTodo?.text) {
+          return { pass: true, message: 'Todo created! Notice it returned the new todo with an auto-generated id.' };
+        }
+        return { pass: false, message: 'Use: mutation { addTodo(text: "Practice GraphQL") { id text completed } }' };
+      },
+      hint: 'Start with the keyword "mutation" then call addTodo with a text argument.',
+      solution: `mutation {
+  addTodo(text: "Practice GraphQL") {
+    id
+    text
+    completed
+  }
+}`,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Toggle a Todo',
+      content: `
+        <p>Todo #2 (<em>"Master mutations"</em>) is currently incomplete.</p>
+        <p>Write a mutation to toggle it to completed. Get back <code>id</code>, <code>text</code>, and <code>completed</code>.</p>
+      `,
+      schema: `type Todo {
+  id: ID!
+  text: String!
+  completed: Boolean!
+  createdAt: String!
+}
+
+type Query {
+  todos: [Todo!]!
+  todo(id: ID!): Todo
+}
+
+type Mutation {
+  addTodo(text: String!): Todo!
+  toggleTodo(id: ID!): Todo
+  deleteTodo(id: ID!): Todo
+  updateTodo(id: ID!, text: String, completed: Boolean): Todo
+}`,
+      resolverKey: '5:todos',
+      defaultQuery: `mutation {
+  toggleTodo(id: "2") {
+    id
+    text
+    completed
+  }
+}`,
+      validate: (result) => {
+        if (result.data?.toggleTodo?.completed === true) {
+          return { pass: true, message: 'Toggled! The completed field flipped from false to true.' };
+        }
+        return { pass: false, message: 'Use: mutation { toggleTodo(id: "2") { id text completed } }' };
+      },
+      hint: 'mutation { toggleTodo(id: "2") { id text completed } }',
+    },
+    {
+      type: 'explain',
+      title: 'Input Types',
+      content: `
+        <p>For mutations with many parameters, use <strong>Input types</strong> to group them cleanly:</p>
+      `,
+      code: `# Instead of many loose arguments:
+type Mutation {
+  createUser(name: String!, email: String!, age: Int, role: String!): User
+}
+
+# Use an input type:
+input CreateUserInput {
+  name: String!
+  email: String!
+  age: Int
+  role: String!
+}
+
+type Mutation {
+  createUser(input: CreateUserInput!): User
+}
+
+# Usage:
+mutation {
+  createUser(input: {
+    name: "Alice"
+    email: "alice@example.com"
+    role: "Admin"
+  }) {
+    id
+    name
+  }
+}`,
+    },
+    {
+      type: 'playground',
+      title: 'Exercise: Multiple Mutations in One Request',
+      content: `
+        <p>You can run <strong>multiple mutations</strong> in a single request.
+        GraphQL executes them <strong>in order</strong> (sequentially, not in parallel).</p>
+        <p>In one request:</p>
+        <ul>
+          <li>Add a new todo (alias: <code>newItem</code>)</li>
+          <li>Toggle todo #1 (alias: <code>toggled</code>)</li>
+        </ul>
+      `,
+      schema: `type Todo {
+  id: ID!
+  text: String!
+  completed: Boolean!
+  createdAt: String!
+}
+
+type Query {
+  todos: [Todo!]!
+  todo(id: ID!): Todo
+}
+
+type Mutation {
+  addTodo(text: String!): Todo!
+  toggleTodo(id: ID!): Todo
+  deleteTodo(id: ID!): Todo
+  updateTodo(id: ID!, text: String, completed: Boolean): Todo
+}`,
+      resolverKey: '5:todos',
+      defaultQuery: `mutation {
+  newItem: addTodo(text: "New task") {
+    id
+    text
+  }
+  toggled: toggleTodo(id: "1") {
+    id
+    text
+    completed
+  }
+}`,
+      validate: (result) => {
+        if (result.data?.newItem?.text && result.data?.toggled) {
+          return { pass: true, message: 'Two mutations in one request! They ran sequentially — addTodo first, then toggleTodo.' };
+        }
+        return { pass: false, message: 'Use aliases to run both addTodo and toggleTodo in one request.' };
+      },
+      hint: 'Use aliases: newItem: addTodo(...) { } and toggled: toggleTodo(...) { }',
+      solution: `mutation {
+  newItem: addTodo(text: "New task") {
+    id
+    text
+  }
+  toggled: toggleTodo(id: "1") {
+    id
+    text
+    completed
+  }
+}`,
+    },
+    {
+      type: 'quiz',
+      title: 'Mutations Quiz',
+      question: 'How do multiple mutations in a single request execute?',
+      choices: [
+        'In parallel (like queries)',
+        'In the order they are written (sequentially)',
+        'In random order',
+        'Only the first mutation executes',
+      ],
+      answer: 'In the order they are written (sequentially)',
+      successMessage: 'Right! Sequential execution guarantees predictable side effects when mutations depend on each other.',
+    },
+  ],
+},
+
 ]; // end LESSONS
